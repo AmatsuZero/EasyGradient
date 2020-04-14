@@ -9,34 +9,16 @@
 Pod::Spec.new do |s|
   s.name             = 'EasyGradient'
   s.version          = '0.1.0'
-  s.summary          = 'A short description of EasyGradient.'
-
-# This description is used to generate tags and improve search results.
-#   * Think: What does it do? Why did you write it? What is the focus?
-#   * Try to keep it short, snappy and to the point.
-#   * Write the description between the DESC delimiters below.
-#   * Finally, don't worry about the indent, CocoaPods strips it!
-
+  s.summary          = '轻松设置渐变色'
   s.description      = <<-DESC
-TODO: Add long description of the pod here.
+  不需要创建子类，不需要 CAGradientLayer，一样设置渐变色
                        DESC
 
   s.homepage         = 'https://github.com/AmatsuZero/EasyGradient'
-  # s.screenshots     = 'www.example.com/screenshots_1', 'www.example.com/screenshots_2'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
   s.author           = { 'AmatsuZero' => 'jiangzhenhua@baidu.com' }
   s.source           = { :git => 'https://github.com/AmatsuZero/EasyGradient.git', :tag => s.version.to_s }
-  # s.social_media_url = 'https://twitter.com/<TWITTER_USERNAME>'
-
   s.ios.deployment_target = '8.0'
-
   s.source_files = 'EasyGradient/Classes/**/*'
-  
-  # s.resource_bundles = {
-  #   'EasyGradient' => ['EasyGradient/Assets/*.png']
-  # }
-
-  # s.public_header_files = 'Pod/Classes/**/*.h'
-  # s.frameworks = 'UIKit', 'MapKit'
-  # s.dependency 'AFNetworking', '~> 2.3'
+  s.frameworks = 'UIKit'
 end

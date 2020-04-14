@@ -1,0 +1,16 @@
+PODS:
+  - EasyGradient (0.1.0)
+
+DEPENDENCIES:
+  - EasyGradient (from `../`)
+
+EXTERNAL SOURCES:
+  EasyGradient:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  EasyGradient: 0f20a07ce2374af7f09ee61b127525bd0c7ed279
+
+PODFILE CHECKSUM: 9d532229508be31bc46fc249be74336818b962b7
+
+COCOAPODS: 1.9.1
