@@ -21,14 +21,16 @@ class ViewController: UIViewController {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 self.label.frame.size.width = 100
                 self.label.layer.borderWidth = 2
+                self.label.borderGradientOption?.useSeparateColor = false
+                self.label.borderGradientOption?.colors = [.cyan, .brown]
             }
         }
-//        let option = EGGradientBackgroundOption()
-//        option.size = label.frame.size
-//        option.direction = .leftToRight
-//        option.locations = [0,1]
-//        option.colors = [.red, .yellow]
-//        label.bgGradientOption = option
+        let option = EGGradientBackgroundOption()
+        option.size = label.frame.size
+        option.direction = .leftToRight
+        option.locations = [0,1]
+        option.colors = [.red, .yellow]
+        label.bgGradientOption = option
        
         let borderOption = EZGradientBorderOption()
         borderOption.size = label.frame.size

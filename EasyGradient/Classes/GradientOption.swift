@@ -59,7 +59,11 @@ import UIKit
     /// 此时是否可以更新颜色
     fileprivate var canUpdate = true
     /// 渐变颜色
-    public var colors: [UIColor]?
+    public var colors: [UIColor]? {
+        didSet {
+            updateGradient()
+        }
+    }
     /// 渐变色尺寸
     public var size = CGSize.zero {
         didSet {
@@ -371,14 +375,29 @@ public extension UIColor {
     /// borderWith 观察者
     var borderWidthObserver: NSKeyValueObservation?
     
+    var borderWidth: CGFloat = 0 {
+        didSet {
+            updateGradient()
+        }
+    }
+    
     public override var associatedView: UIView? {
         didSet {
             /// 观察
             borderWidthObserver = associatedView?.observe(\UIView.layer.borderWidth,
-                                                          changeHandler: { [weak self] view, value in
-                                                            self?.updateGradient()
+                                                        changeHandler: { [weak self] view, value in
+                                                            guard let self = self else {
+                                                                return
+                                                            }
+                                                            let screen = view.window?.screen ?? UIScreen.main
+                                                            var width = view.layer.borderWidth
+                                                            if width <= 0 {
+                                                                width = self.drawsThinBorders ? 1.0 / screen.scale : 1.0
+                                                            }
+                                                            self.borderWidth = width
             })
-            updateGradient()
+            let screen = associatedView?.window?.screen ?? UIScreen.main
+            borderWidth = associatedView?.layer.borderWidth ?? (drawsThinBorders ? 1.0 / screen.scale : 1.0)
         }
     }
     
@@ -394,8 +413,7 @@ public extension UIColor {
             super.drawGradient(ctx, glossGradient: glossGradient)
             return
         }
-        let screen = associatedView?.window?.screen ?? UIScreen.main
-        let borderWidth: CGFloat = associatedView?.layer.borderWidth ?? (drawsThinBorders ? 1.0 / screen.scale : 1.0)
+       
         // Top border
         if let color = topBorderColor {
             ctx.setFillColor(color.cgColor)
@@ -436,8 +454,23 @@ public extension UIColor {
         obj.bottomBorderColor = bottomBorderColor
         obj.drawsThinBorders = drawsThinBorders
         obj.useSeparateColor = useSeparateColor
+        obj.borderWidth = borderWidth
         obj.canUpdate = true
         return obj
+    }
+    
+    public override func isEqual(_ object: Any?) -> Bool {
+        let ret = super.isEqual(object)
+        guard let another = object as? EZGradientBorderOption else {
+            return false
+        }
+        return ret && self.borderWidth == another.borderWidth
+    }
+    
+    public override var hash: Int {
+        var value = super.hash
+        value ^= (borderWidth as NSNumber).hashValue
+        return value
     }
 }
 
