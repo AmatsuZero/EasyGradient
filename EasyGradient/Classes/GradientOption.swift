@@ -117,16 +117,24 @@ import UIKit
     }
     /// KVO 观察者
     var observer: NSKeyValueObservation?
+    weak var _associatedView: UIView?
     /// 关联变化的视图
     public weak var associatedView: UIView? {
-        didSet {
-            observer = associatedView?.observe(\UIView.frame, changeHandler: { [weak self] view, value in
+        set {
+            if _associatedView == newValue {
+                return
+            }
+            _associatedView = newValue
+            observer = _associatedView?.observe(\UIView.frame, changeHandler: { [weak self] view, value in
                 guard let self = self else {
                     return
                 }
                 self.size = view.frame.size
             })
             updateGradient()
+        }
+        get {
+            _associatedView
         }
     }
     
@@ -143,8 +151,13 @@ import UIKit
         }
     }
     
+    required public override init() {
+        super.init()
+    }
+    
     public func copy(with zone: NSZone? = nil) -> Any {
-        let option = EZGradientOption()
+        let option = type(of: self).init()
+        option.canUpdate = false
         option.colors = colors
         option.dimmedColors = dimmedColors
         option.size = size
@@ -154,13 +167,15 @@ import UIKit
         option.end = end
         option.mode = mode
         option.automaticallyDims = automaticallyDims
+        option._associatedView = _associatedView
+        option.canUpdate = true
         return option
     }
     
     func updateGradient() {}
     
-    func gradientColors(isDimmed: Bool) -> [UIColor]? {
-        if isDimmed {
+    func gradientColors() -> [UIColor]? {
+        if  associatedView?.tintAdjustmentMode == .dimmed {
             if let colors = dimmedColors {
                 return colors
             }
@@ -177,8 +192,8 @@ import UIKit
         return colors
     }
     
-    public func asCGGradient(isDimmed: Bool) -> CGGradient? {
-        guard let colors = gradientColors(isDimmed: isDimmed) else {
+    public func asCGGradient() -> CGGradient? {
+        guard let colors = gradientColors() else {
             return nil
         }
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -217,9 +232,9 @@ import UIKit
         }
     }
     
-    public func asGradientLayer(isDimmed: Bool = false) -> CAGradientLayer {
+    public func asGradientLayer() -> CAGradientLayer {
         let layer = CAGradientLayer()
-        layer.colors = gradientColors(isDimmed: isDimmed)?.map { $0.cgColor }
+        layer.colors = gradientColors()?.map { $0.cgColor }
         layer.locations = locations?.map { $0 as NSNumber }
         layer.endPoint = end
         layer.startPoint = start
@@ -238,6 +253,7 @@ import UIKit
         return another.mode == mode && another.colors == colors && another.locations == locations
             && another.start == start && another.end == end && another.dimmedColors == dimmedColors
             && another.automaticallyDims == automaticallyDims && another.size == size
+            && another.associatedView == associatedView
     }
     
     public override var hash: Int {
@@ -255,6 +271,9 @@ import UIKit
         if let colors = dimmedColors {
             value ^= colors.hashValue
         }
+        if let view = associatedView {
+            value ^= view.hashValue
+        }
         return value
     }
 }
@@ -268,7 +287,6 @@ public extension UIColor {
     
     static func gradientColor(with option: EZGradientOption,
                               cache: NSCache<EZGradientOption, UIColor>? = UIColor.defaultCache) -> UIColor? {
-        let isDimmed = option.associatedView?.tintAdjustmentMode == .dimmed
         guard option.size.width > 0, option.size.height > 0, // 宽高不得为0
             let option = option.copy() as? EZGradientOption else {
                 return nil
@@ -278,7 +296,7 @@ public extension UIColor {
             return color?.copy() as? UIColor
         }
         var gradientImg: UIImage?
-        guard let gradient = option.asCGGradient(isDimmed: isDimmed) else {
+        guard let gradient = option.asCGGradient() else {
             return nil
         }
         UIGraphicsBeginImageContext(option.size)
@@ -305,17 +323,121 @@ public extension UIColor {
         guard canUpdate else {
             return
         }
-        associatedView?.backgroundColor = asColor()
+        // 奇怪的问题，UILabel 发现 background Color 会在尺寸上有大约 2.1pt的偏差，原因暂时不明
+        associatedView?.backgroundColor = nil
+        associatedView?.layer.backgroundColor = asColor()?.cgColor
     }
 }
 
 @objc
 @objcMembers public class EZGradientBorderOption: EZGradientOption {
+    /// 上边颜色
+    public var topBorderColor: UIColor? {
+        didSet {
+            updateGradient()
+        }
+    }
+    /// 右边颜色
+    public var rightBorderColor: UIColor? {
+        didSet {
+            updateGradient()
+        }
+    }
+    ///  底边颜色
+    public var bottomBorderColor: UIColor? {
+        didSet {
+            updateGradient()
+        }
+    }
+    /// 左边颜色
+    public var leftBorderColor: UIColor? {
+        didSet {
+            updateGradient()
+        }
+    }
+    
+    /// 四个边是否分别设置颜色，默认为false，统一设置为渐变色
+    public var useSeparateColor = false {
+        didSet {
+            updateGradient()
+        }
+    }
+    
+    public var drawsThinBorders: Bool = true {
+        didSet {
+            updateGradient()
+        }
+    }
+    /// borderWith 观察者
+    var borderWidthObserver: NSKeyValueObservation?
+    
+    public override var associatedView: UIView? {
+        didSet {
+            /// 观察
+            borderWidthObserver = associatedView?.observe(\UIView.layer.borderWidth,
+                                                          changeHandler: { [weak self] view, value in
+                                                            self?.updateGradient()
+            })
+            updateGradient()
+        }
+    }
+    
+    override func gradientColors() -> [UIColor]? {
+        guard useSeparateColor else {
+            return super.gradientColors()
+        }
+        return [topBorderColor, leftBorderColor, bottomBorderColor, rightBorderColor].compactMap { $0 }
+    }
+    
+    override func drawGradient(_ ctx: CGContext, glossGradient: CGGradient) {
+        guard useSeparateColor else {
+            super.drawGradient(ctx, glossGradient: glossGradient)
+            return
+        }
+        let screen = associatedView?.window?.screen ?? UIScreen.main
+        let borderWidth: CGFloat = associatedView?.layer.borderWidth ?? (drawsThinBorders ? 1.0 / screen.scale : 1.0)
+        // Top border
+        if let color = topBorderColor {
+            ctx.setFillColor(color.cgColor)
+            ctx.fill(CGRect(origin: .zero, size: .init(width: size.width, height: borderWidth)))
+        }
+        let sideY: CGFloat = topBorderColor != nil ? borderWidth : 0
+        let sideHeight = size.height - sideY - (bottomBorderColor != nil ? borderWidth : 0)
+        // Right border
+        if let color = rightBorderColor {
+            ctx.setFillColor(color.cgColor)
+            ctx.fill(CGRect(x: size.width - borderWidth, y: sideY, width: borderWidth, height: sideHeight))
+        }
+        // Bottom border
+        if let color = bottomBorderColor {
+            ctx.setFillColor(color.cgColor)
+            ctx.fill(CGRect(x: 0, y: size.height - borderWidth, width: size.width, height: borderWidth))
+        }
+        // Left border
+        if let color = leftBorderColor {
+            ctx.setFillColor(color.cgColor)
+            ctx.fill(CGRect(x: 0, y: sideY, width: borderWidth, height: sideHeight))
+        }
+    }
+    
     override func updateGradient() {
         guard canUpdate else {
             return
         }
         associatedView?.layer.borderColor = asColor()?.cgColor
+    }
+    
+    public override func copy(with zone: NSZone? = nil) -> Any {
+        let obj = super.copy(with: zone) as! EZGradientBorderOption
+        obj.canUpdate = false
+        obj.topBorderColor = topBorderColor
+        obj.rightBorderColor = rightBorderColor
+        obj.leftBorderColor = leftBorderColor
+        obj.bottomBorderColor = bottomBorderColor
+        obj.drawsThinBorders = drawsThinBorders
+        obj.useSeparateColor = useSeparateColor
+        obj.canUpdate = true
+        return obj
     }
 }
 
