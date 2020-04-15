@@ -22,16 +22,13 @@ public extension UIView {
         }
     }
     
-    @objc var borderGradientOption: EZGradientOption? {
+    @objc var borderGradientOption: EZGradientBorderOption? {
         set {
             newValue?.associatedView = self
-            if let option = newValue {
-                backgroundColor = UIColor.gradientColor(with: option)
-            }
             objc_setAssociatedObject(self, &borderGradientAssociateKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         }
         get {
-            objc_getAssociatedObject(self, &borderGradientAssociateKey) as? EZGradientOption
+            objc_getAssociatedObject(self, &borderGradientAssociateKey) as? EZGradientBorderOption
         }
     }
 }

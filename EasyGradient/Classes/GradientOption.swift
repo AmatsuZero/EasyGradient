@@ -45,15 +45,31 @@ import UIKit
     case linear
     /// 辐射
     case radial
+    
+    func asGradientLayerType() -> String {
+        switch self {
+        case .radial: return "radial"
+        default: return "axial"
+        }
+    }
 }
 
 @objc
 @objcMembers public class EZGradientOption: NSObject, NSCopying {
+    /// 此时是否可以更新颜色
+    fileprivate var canUpdate = true
     /// 渐变颜色
     public var colors: [UIColor]?
     /// 渐变色尺寸
     public var size = CGSize.zero {
         didSet {
+            canUpdate = false
+            if let direction = direction {
+                let (start, end) = direction.convert(size: size)
+                self.start = start
+                self.end = end
+            }
+            canUpdate = true
             updateGradient()
         }
     }
@@ -94,7 +110,7 @@ import UIKit
         }
     }
     /// 渐变色位置
-    public var drawOptions: CGGradientDrawingOptions = .drawsAfterEndLocation {
+    public var drawOptions: CGGradientDrawingOptions = CGGradientDrawingOptions() {
         didSet {
             updateGradient()
         }
@@ -114,21 +130,17 @@ import UIKit
         }
     }
     
-    public convenience init(direction: EZGradientDirection = .leftToRight,
-                            size: CGSize) {
-        self.init()
-        let (start, end) = direction.convert(size: size)
-        self.start = start
-        self.end = end
-        self.size = size
-    }
-    
-    public convenience init(beginColor: UIColor,
-                            endColor: UIColor,
-                            size: CGSize,
-                            direction: EZGradientDirection = .leftToRight) {
-        self.init(direction: direction, size: size)
-        self.colors = [beginColor, endColor]
+    public var direction: EZGradientDirection? {
+        didSet {
+            canUpdate = false
+            if let newValue = direction {
+                let (start, end) = newValue.convert(size: size)
+                self.start = start
+                self.end = end
+            }
+            canUpdate = true
+            updateGradient()
+        }
     }
     
     public func copy(with zone: NSZone? = nil) -> Any {
@@ -141,13 +153,14 @@ import UIKit
         option.start = start
         option.end = end
         option.mode = mode
+        option.automaticallyDims = automaticallyDims
         return option
     }
     
     func updateGradient() {}
     
-    func gradientColors() -> [UIColor]? {
-        if associatedView?.tintAdjustmentMode == .dimmed {
+    func gradientColors(isDimmed: Bool) -> [UIColor]? {
+        if isDimmed {
             if let colors = dimmedColors {
                 return colors
             }
@@ -164,8 +177,8 @@ import UIKit
         return colors
     }
     
-    public func asCGGradient() -> CGGradient? {
-        guard let colors = gradientColors() else {
+    public func asCGGradient(isDimmed: Bool) -> CGGradient? {
+        guard let colors = gradientColors(isDimmed: isDimmed) else {
             return nil
         }
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -188,6 +201,10 @@ import UIKit
         return CGGradient(colorsSpace: colorSpace, colors: gradientColors, locations: locations)
     }
     
+    public func asColor() -> UIColor? {
+        return UIColor.gradientColor(with: self)
+    }
+    
     func drawGradient(_ ctx: CGContext, glossGradient: CGGradient) {
         switch mode {
         case .linear:
@@ -198,6 +215,17 @@ import UIKit
                                    startRadius: 0, endCenter: center,
                                    endRadius: min(size.width, size.height) / 2, options: drawOptions)
         }
+    }
+    
+    public func asGradientLayer(isDimmed: Bool = false) -> CAGradientLayer {
+        let layer = CAGradientLayer()
+        layer.colors = gradientColors(isDimmed: isDimmed)?.map { $0.cgColor }
+        layer.locations = locations?.map { $0 as NSNumber }
+        layer.endPoint = end
+        layer.startPoint = start
+        layer.type = mode.asGradientLayerType()
+        layer.frame = CGRect(origin: .zero, size: size)
+        return layer
     }
     
     public override func isEqual(_ object: Any?) -> Bool {
@@ -234,57 +262,60 @@ import UIKit
 public extension UIColor {
     static let defaultCache: NSCache<EZGradientOption, UIColor> = {
         let cache = NSCache<EZGradientOption, UIColor>()
+        cache.name = "com.daubertjiang.ezgradient.cache"
         return cache
     }()
     
     static func gradientColor(with option: EZGradientOption,
                               cache: NSCache<EZGradientOption, UIColor>? = UIColor.defaultCache) -> UIColor? {
+        let isDimmed = option.associatedView?.tintAdjustmentMode == .dimmed
         guard option.size.width > 0, option.size.height > 0, // 宽高不得为0
             let option = option.copy() as? EZGradientOption else {
                 return nil
         }
-        let color = cache?.object(forKey: option)
+        var color = cache?.object(forKey: option)
         guard color == nil else {
-            return color
+            return color?.copy() as? UIColor
         }
         var gradientImg: UIImage?
-        guard let gradient = option.asCGGradient() else {
+        guard let gradient = option.asCGGradient(isDimmed: isDimmed) else {
             return nil
         }
-        if #available(iOS 10.0, *) {
-            let render = UIGraphicsImageRenderer(size: option.size)
-            gradientImg = render.image(actions: { option.drawGradient($0.cgContext, glossGradient: gradient) })
-        } else {
-            UIGraphicsBeginImageContext(option.size)
-            guard let ctx = UIGraphicsGetCurrentContext() else {
-                return nil
-            }
-            UIGraphicsPushContext(ctx)
-            option.drawGradient(ctx, glossGradient: gradient)
-            UIGraphicsPopContext()
-            gradientImg = UIGraphicsGetImageFromCurrentImageContext()
-            UIGraphicsEndImageContext()
+        UIGraphicsBeginImageContext(option.size)
+        guard let ctx = UIGraphicsGetCurrentContext() else {
+            return nil
         }
-        guard let img = gradientImg,
-            let result = UIColor(patternImage: img).copy() as? UIColor else {
-                return nil
+        option.drawGradient(ctx, glossGradient: gradient)
+        gradientImg = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        guard let img = gradientImg else {
+            return nil
         }
-        cache?.setObject(result, forKey: option)
-        return result
+        color = UIColor(patternImage: img)
+        if let color = color {
+            cache?.setObject(color, forKey: option)
+        }
+        return color?.copy() as? UIColor
     }
 }
 
 @objc
 @objcMembers public class EGGradientBackgroundOption: EZGradientOption {
     override func updateGradient() {
-        associatedView?.backgroundColor = UIColor.gradientColor(with: self)
+        guard canUpdate else {
+            return
+        }
+        associatedView?.backgroundColor = asColor()
     }
 }
 
 @objc
 @objcMembers public class EZGradientBorderOption: EZGradientOption {
     override func updateGradient() {
-        associatedView?.layer.borderColor = UIColor.gradientColor(with: self)?.cgColor
+        guard canUpdate else {
+            return
+        }
+        associatedView?.layer.borderColor = asColor()?.cgColor
     }
 }
 
