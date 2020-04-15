@@ -10,6 +10,7 @@ import UIKit
 
 private var bgGradientAssociateKey: Void?
 private var borderGradientAssociateKey: Void?
+private var textGradientAssociateKey: Void?
 
 public extension UIView {
     @objc var bgGradientOption: EGGradientBackgroundOption? {
@@ -29,6 +30,42 @@ public extension UIView {
         }
         get {
             objc_getAssociatedObject(self, &borderGradientAssociateKey) as? EZGradientBorderOption
+        }
+    }
+}
+
+public extension UILabel {
+    @objc var textGradientOption: EZTextGradientOption? {
+        set {
+            newValue?.associatedView = self
+            objc_setAssociatedObject(self, &textGradientAssociateKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+        get {
+            objc_getAssociatedObject(self, &textGradientAssociateKey) as? EZTextGradientOption
+        }
+    }
+}
+
+public extension UITextView {
+    @objc var textGradientOption: EZTextGradientOption? {
+        set {
+            newValue?.associatedView = self
+            objc_setAssociatedObject(self, &textGradientAssociateKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+        get {
+            objc_getAssociatedObject(self, &textGradientAssociateKey) as? EZTextGradientOption
+        }
+    }
+}
+
+public extension UITextField {
+    @objc var textGradientOption: EZTextGradientOption? {
+        set {
+            newValue?.associatedView = self
+            objc_setAssociatedObject(self, &textGradientAssociateKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+        get {
+            objc_getAssociatedObject(self, &textGradientAssociateKey) as? EZTextGradientOption
         }
     }
 }

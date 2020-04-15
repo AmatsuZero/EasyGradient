@@ -125,6 +125,9 @@ import UIKit
     /// 关联变化的视图
     public weak var associatedView: UIView? {
         set {
+            defer {
+                size = newValue?.frame.size ?? .zero
+            }
             if _associatedView == newValue {
                 return
             }
@@ -135,7 +138,6 @@ import UIKit
                 }
                 self.size = view.frame.size
             })
-            updateGradient()
         }
         get {
             _associatedView
@@ -202,12 +204,12 @@ import UIKit
         }
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let colorSpaceModel = colorSpace.model
-        let gradientColors = colors.map { (color: UIColor) -> AnyObject in
+        let gradientColors = colors.map { (color: UIColor) -> CGColor in
             let cgColor = color.cgColor
             let cgColorSpace = cgColor.colorSpace ?? colorSpace
             // The color's color space is RGB, simply add it.
             if cgColorSpace.model == colorSpaceModel {
-                return cgColor as AnyObject
+                return cgColor
             }
             // Convert to RGB. There may be a more efficient way to do this.
             var red: CGFloat = 0
@@ -215,7 +217,7 @@ import UIKit
             var green: CGFloat = 0
             var alpha: CGFloat = 0
             color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-            return UIColor(red: red, green: green, blue: blue, alpha: alpha).cgColor as AnyObject
+            return UIColor(red: red, green: green, blue: blue, alpha: alpha).cgColor
         } as NSArray
         return CGGradient(colorsSpace: colorSpace, colors: gradientColors, locations: locations)
     }
@@ -245,6 +247,21 @@ import UIKit
         layer.type = mode.asGradientLayerType()
         layer.frame = CGRect(origin: .zero, size: size)
         return layer
+    }
+    
+    public func asImage() -> UIImage? {
+        guard let gradient = asCGGradient() else {
+            return nil
+        }
+        var gradientImg: UIImage?
+        UIGraphicsBeginImageContext(size)
+        guard let ctx = UIGraphicsGetCurrentContext() else {
+            return nil
+        }
+        drawGradient(ctx, glossGradient: gradient)
+        gradientImg = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return gradientImg
     }
     
     public override func isEqual(_ object: Any?) -> Bool {
@@ -299,18 +316,7 @@ public extension UIColor {
         guard color == nil else {
             return color?.copy() as? UIColor
         }
-        var gradientImg: UIImage?
-        guard let gradient = option.asCGGradient() else {
-            return nil
-        }
-        UIGraphicsBeginImageContext(option.size)
-        guard let ctx = UIGraphicsGetCurrentContext() else {
-            return nil
-        }
-        option.drawGradient(ctx, glossGradient: gradient)
-        gradientImg = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        guard let img = gradientImg else {
+        guard let img = option.asImage() else {
             return nil
         }
         color = UIColor(patternImage: img)
@@ -327,9 +333,11 @@ public extension UIColor {
         guard canUpdate else {
             return
         }
-        // 奇怪的问题，UILabel 发现 background Color 会在尺寸上有大约 2.1pt的偏差，原因暂时不明
-        associatedView?.backgroundColor = nil
-        associatedView?.layer.backgroundColor = asColor()?.cgColor
+        // Hack for UIlabel for weired space
+        if let label = associatedView as? UILabel, label.text == nil {
+            label.text = ""
+        }
+        associatedView?.backgroundColor = asColor()
     }
 }
 
@@ -385,7 +393,7 @@ public extension UIColor {
         didSet {
             /// 观察
             borderWidthObserver = associatedView?.observe(\UIView.layer.borderWidth,
-                                                        changeHandler: { [weak self] view, value in
+                                                          changeHandler: { [weak self] view, value in
                                                             guard let self = self else {
                                                                 return
                                                             }
@@ -408,12 +416,15 @@ public extension UIColor {
         return [topBorderColor, leftBorderColor, bottomBorderColor, rightBorderColor].compactMap { $0 }
     }
     
-    override func drawGradient(_ ctx: CGContext, glossGradient: CGGradient) {
+    public override func asImage() -> UIImage? {
         guard useSeparateColor else {
-            super.drawGradient(ctx, glossGradient: glossGradient)
-            return
+            return super.asImage()
         }
-       
+        UIGraphicsBeginImageContext(size)
+        guard let ctx = UIGraphicsGetCurrentContext() else {
+            return nil
+        }
+        var gradientImg: UIImage?
         // Top border
         if let color = topBorderColor {
             ctx.setFillColor(color.cgColor)
@@ -436,6 +447,9 @@ public extension UIColor {
             ctx.setFillColor(color.cgColor)
             ctx.fill(CGRect(x: 0, y: sideY, width: borderWidth, height: sideHeight))
         }
+        gradientImg = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        return gradientImg
     }
     
     override func updateGradient() {
@@ -480,47 +494,84 @@ public extension UIColor {
     var textObserver: NSKeyValueObservation?
     /// 字体观察者
     var fontObserver: NSKeyValueObservation?
-    //    override func observeView(_ view: UIView) {
-    //        super.observeView(view)
-    //        switch view {
-    //        case let label as UILabel: setObserverForLabel(label)
-    //        case let textView as UITextView: setObserverForTextView(textView)
-    //        case let textField as UITextField: setObserverForTextField(textField)
-    //        default: break
-    //        }
-    //    }
+    
+    public override var associatedView: UIView? {
+        didSet {
+            guard let view = associatedView else {
+                return
+            }
+            switch view {
+            case let label as UILabel: setObserverForLabel(label)
+            case let textView as UITextView: setObserverForTextView(textView)
+            case let textField as UITextField: setObserverForTextField(textField)
+            default: break
+            }
+        }
+    }
+    
+    var text: String? {
+        didSet {
+            guard let font = self.font,
+                let str = text else {
+                    return
+            }
+            canUpdate = false
+            let attrStr = NSAttributedString(string: str, attributes: [
+                .font: font
+            ])
+            size = attrStr.boundingRect(with: size, options: .usesFontLeading, context: nil).size
+            canUpdate = true
+            updateGradient()
+        }
+    }
+    
+    var font: UIFont? {
+        didSet {
+            guard let font = self.font,
+                let str = text else {
+                    return
+            }
+            canUpdate = false
+            let attrStr = NSAttributedString(string: str, attributes: [
+                .font: font
+            ])
+            size = attrStr.boundingRect(with: size, options: .usesFontLeading, context: nil).size
+            canUpdate = true
+            updateGradient()
+        }
+    }
     
     func setObserverForLabel(_ label: UILabel) {
-        textObserver = label.observe(\UILabel.text, changeHandler: { view, value in
-            
+        textObserver = label.observe(\UILabel.text, changeHandler: { [weak self] view, value in
+            self?.text  = view.text
         })
-        
-        fontObserver = label.observe(\UILabel.font, changeHandler: { view, value in
-            
+        fontObserver = label.observe(\UILabel.font, changeHandler: { [weak self] view, value in
+            self?.font = view.font
         })
     }
     
     func setObserverForTextView(_ textView: UITextView) {
-        textObserver = textView.observe(\UITextView.text, changeHandler: { view, value in
-            
+        textObserver = textView.observe(\UITextView.text, changeHandler: { [weak self] view, value in
+            self?.text  = view.text
         })
-        
-        fontObserver = textView.observe(\UITextView.font, changeHandler: { view, value in
-            
+        fontObserver = textView.observe(\UITextView.font, changeHandler: { [weak self] view, value in
+            self?.font = view.font
         })
     }
     
     func setObserverForTextField(_ textField: UITextField) {
-        textObserver = textField.observe(\UITextField.text, changeHandler: { view, value in
-            
+        textObserver = textField.observe(\UITextField.text, changeHandler: { [weak self] view, value in
+            self?.text  = view.text
         })
-        
-        fontObserver = textField.observe(\UITextField.font, changeHandler: { view, value in
-            
+        fontObserver = textField.observe(\UITextField.font, changeHandler: { [weak self] view, value in
+            self?.font = view.font
         })
     }
     
-    func updateGradientColor(text: String, font: UIFont) {
-        
+    override func updateGradient() {
+        guard canUpdate else {
+            return
+        }
+        associatedView?.setValue(asColor(), forKey: "textColor")
     }
 }
