@@ -515,13 +515,10 @@ public extension UIColor {
                 let str = text else {
                     return
             }
-            canUpdate = false
             let attrStr = NSAttributedString(string: str, attributes: [
                 .font: font
             ])
             size = attrStr.boundingRect(with: size, options: .usesFontLeading, context: nil).size
-            canUpdate = true
-            updateGradient()
         }
     }
     
@@ -531,14 +528,15 @@ public extension UIColor {
                 let str = text else {
                     return
             }
-            canUpdate = false
             let attrStr = NSAttributedString(string: str, attributes: [
                 .font: font
             ])
             size = attrStr.boundingRect(with: size, options: .usesFontLeading, context: nil).size
-            canUpdate = true
-            updateGradient()
         }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     func setObserverForLabel(_ label: UILabel) {
@@ -551,21 +549,32 @@ public extension UIColor {
     }
     
     func setObserverForTextView(_ textView: UITextView) {
-        textObserver = textView.observe(\UITextView.text, changeHandler: { [weak self] view, value in
-            self?.text  = view.text
-        })
+        NotificationCenter.default.addObserver(self, selector: #selector(textViewDidChange(_:)), name: .UITextViewTextDidChange, object: nil)
         fontObserver = textView.observe(\UITextView.font, changeHandler: { [weak self] view, value in
             self?.font = view.font
         })
     }
     
     func setObserverForTextField(_ textField: UITextField) {
-        textObserver = textField.observe(\UITextField.text, changeHandler: { [weak self] view, value in
-            self?.text  = view.text
-        })
+        canUpdate = false
+        textField.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
         fontObserver = textField.observe(\UITextField.font, changeHandler: { [weak self] view, value in
             self?.font = view.font
         })
+        text = textField.text
+        font = textField.font
+        canUpdate = true
+    }
+    
+    @objc func textFieldDidChange(_ textField: UITextField) {
+        text = textField.text
+    }
+    
+    func textViewDidChange(_ notification: Notification) {
+        guard let textView = notification.object as? UITextView, textView === associatedView else {
+            return
+        }
+        text = textView.text
     }
     
     override func updateGradient() {

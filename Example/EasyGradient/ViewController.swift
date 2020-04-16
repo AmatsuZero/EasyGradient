@@ -11,7 +11,9 @@ import EasyGradient
 
 class ViewController: UIViewController {
     
-    var label = UILabel(frame: .init(origin: CGPoint(x: 10, y: 64), size: CGSize(width: 300, height: 100)))
+    let label = UILabel(frame: .init(origin: CGPoint(x: 10, y: 64), size: CGSize(width: 300, height: 100)))
+    let textField = UITextField(frame: .init(origin: .init(x: 10, y: 174), size: .init(width: 300, height: 300)))
+    let textView = UITextView(frame: .init(origin: .init(x: 10, y: 484), size: .init(width: 300, height: 400)))
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -27,7 +29,6 @@ class ViewController: UIViewController {
         }
         let option = EGGradientBackgroundOption()
         option.direction = .leftToRight
-        option.locations = [0,1]
         option.colors = [.red, .yellow]
         label.bgGradientOption = option
        
@@ -40,12 +41,21 @@ class ViewController: UIViewController {
         label.layer.borderWidth = 4
         label.borderGradientOption = borderOption
 
-        label.textAlignment = .center
-        label.text = "Hello world"
+        view.addSubview(textField)
+        textField.text = "Test"
         let textOption = EZTextGradientOption()
-        textOption.direction = .topToBottom
-        textOption.colors = [.purple, .brown]
-        label.textGradientOption = textOption
+        textOption.direction = .leftToRight
+        textOption.colors = [.red, .yellow]
+        textField.textGradientOption = textOption
+        textField.backgroundColor = .darkGray
+        
+        view.addSubview(textView)
+        textView.backgroundColor = .gray
+        textView.font = UIFont.systemFont(ofSize: 16)
+        let textOption2 = EZTextGradientOption()
+        textOption2.direction = .leftToRight
+        textOption2.colors = [.red, .yellow]
+        textView.textGradientOption = textOption2
     }
 
     override func didReceiveMemoryWarning() {
