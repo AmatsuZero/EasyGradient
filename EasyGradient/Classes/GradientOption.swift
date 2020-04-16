@@ -218,7 +218,7 @@ import UIKit
             var alpha: CGFloat = 0
             color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
             return UIColor(red: red, green: green, blue: blue, alpha: alpha).cgColor
-        } as NSArray
+            } as NSArray
         return CGGradient(colorsSpace: colorSpace, colors: gradientColors, locations: locations)
     }
     
@@ -509,72 +509,44 @@ public extension UIColor {
         }
     }
     
-    var text: String? {
+    /// 真实文字size
+    fileprivate var _internalSize: CGSize = .zero {
         didSet {
-            guard let font = self.font,
-                let str = text else {
-                    return
+           canUpdate = false
+            if let direction = direction {
+                let (start, end) = direction.convert(size: size)
+                self.start = start
+                self.end = end
             }
-            let attrStr = NSAttributedString(string: str, attributes: [
-                .font: font
-            ])
-            size = attrStr.boundingRect(with: size, options: .usesFontLeading, context: nil).size
+            canUpdate = true
+            updateGradient()
         }
     }
     
-    var font: UIFont? {
-        didSet {
-            guard let font = self.font,
-                let str = text else {
-                    return
+    public override var size: CGSize {
+        set {
+            guard let view = associatedView else {
+                _internalSize = newValue
+                return
             }
-            let attrStr = NSAttributedString(string: str, attributes: [
-                .font: font
-            ])
-            size = attrStr.boundingRect(with: size, options: .usesFontLeading, context: nil).size
+            switch view { // 根据 View 类型调整真实 size
+            case let label as UILabel:
+                _internalSize = label.intrinsicContentSize
+            case let textView as UITextView:
+                updateSize(in: textView)
+            case let textField as UITextField:
+                _internalSize = textField.intrinsicContentSize
+            default:
+                _internalSize = newValue
+            }
+        }
+        get {
+            _internalSize
         }
     }
     
     deinit {
         NotificationCenter.default.removeObserver(self)
-    }
-    
-    func setObserverForLabel(_ label: UILabel) {
-        textObserver = label.observe(\UILabel.text, changeHandler: { [weak self] view, value in
-            self?.text  = view.text
-        })
-        fontObserver = label.observe(\UILabel.font, changeHandler: { [weak self] view, value in
-            self?.font = view.font
-        })
-    }
-    
-    func setObserverForTextView(_ textView: UITextView) {
-        NotificationCenter.default.addObserver(self, selector: #selector(textViewDidChange(_:)), name: .UITextViewTextDidChange, object: nil)
-        fontObserver = textView.observe(\UITextView.font, changeHandler: { [weak self] view, value in
-            self?.font = view.font
-        })
-    }
-    
-    func setObserverForTextField(_ textField: UITextField) {
-        canUpdate = false
-        textField.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
-        fontObserver = textField.observe(\UITextField.font, changeHandler: { [weak self] view, value in
-            self?.font = view.font
-        })
-        text = textField.text
-        font = textField.font
-        canUpdate = true
-    }
-    
-    @objc func textFieldDidChange(_ textField: UITextField) {
-        text = textField.text
-    }
-    
-    func textViewDidChange(_ notification: Notification) {
-        guard let textView = notification.object as? UITextView, textView === associatedView else {
-            return
-        }
-        text = textView.text
     }
     
     override func updateGradient() {
@@ -584,3 +556,58 @@ public extension UIColor {
         associatedView?.setValue(asColor(), forKey: "textColor")
     }
 }
+// MARK: - 处理 UITextField
+extension EZTextGradientOption {
+    func setObserverForTextField(_ textField: UITextField) {
+        textField.addTarget(self, action: #selector(textFieldDidChange(_:)), for: .editingChanged)
+        fontObserver = textField.observe(\UITextField.font, changeHandler: { [weak self] view, value in
+            self?._internalSize = view.intrinsicContentSize
+        })
+        _internalSize = textField.intrinsicContentSize
+    }
+    
+    @objc func textFieldDidChange(_ textField: UITextField) {
+        _internalSize = textField.intrinsicContentSize
+    }
+}
+// MARK: - 处理 UILabel
+extension EZTextGradientOption {
+    func setObserverForLabel(_ label: UILabel) {
+        textObserver = label.observe(\UILabel.text, changeHandler: { [weak self] view, value in
+            self?._internalSize = view.intrinsicContentSize
+        })
+        fontObserver = label.observe(\UILabel.font, changeHandler: { [weak self] view, value in
+            self?._internalSize = view.intrinsicContentSize
+        })
+        _internalSize = label.intrinsicContentSize
+        updateGradient()
+    }
+}
+// MARK: - 处理 UITextView
+extension EZTextGradientOption {
+    func setObserverForTextView(_ textView: UITextView) {
+        NotificationCenter.default.addObserver(self, selector: #selector(textViewDidChange(_:)),
+                                               name: .UITextViewTextDidChange, object: nil)
+        fontObserver = textView.observe(\UITextView.font, changeHandler: { [weak self] view, value in
+            self?.updateSize(in: view)
+        })
+        updateSize(in: textView)
+    }
+    
+    func textViewDidChange(_ notification: Notification) {
+        guard let textView = notification.object as? UITextView, textView === associatedView else {
+            return
+        }
+        updateSize(in: textView)
+    }
+    
+    func updateSize(in textView: UITextView) {
+        guard let str = textView.text, let font = textView.font else {
+            return
+        }
+        let attrStr = NSAttributedString(string: str, attributes: [ .font: font ])
+        _internalSize = attrStr.boundingRect(with: textView.contentSize,
+                                             options: .usesLineFragmentOrigin, context: nil).size
+    }
+}
+

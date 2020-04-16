@@ -19,18 +19,22 @@ class ViewController: UIViewController {
         super.viewDidLoad()
         view.addSubview(label)
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.label.frame.size.width = 200
+//            self.label.frame.size.width = 200
+            self.label.text = "Hello"
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                self.label.frame.size.width = 100
-                self.label.layer.borderWidth = 2
-                self.label.borderGradientOption?.useSeparateColor = false
-                self.label.borderGradientOption?.colors = [.cyan, .brown]
+                 self.label.text = "H"
+//                self.label.frame.size.width = 100
+//                self.label.layer.borderWidth = 2
+//                self.label.borderGradientOption?.useSeparateColor = false
+//                self.label.borderGradientOption?.colors = [.cyan, .brown]
             }
         }
-        let option = EGGradientBackgroundOption()
-        option.direction = .leftToRight
-        option.colors = [.red, .yellow]
-        label.bgGradientOption = option
+        label.textAlignment = .center
+        label.text = "Hello world"
+        let textOptionA = EZTextGradientOption()
+        textOptionA.direction = .leftToRight
+        textOptionA.colors = [.red, .yellow]
+        label.textGradientOption = textOptionA
        
         let borderOption = EZGradientBorderOption()
         borderOption.topBorderColor = .magenta
