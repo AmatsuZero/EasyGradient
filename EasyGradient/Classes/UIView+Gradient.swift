@@ -69,3 +69,19 @@ public extension UITextField {
         }
     }
 }
+
+@propertyWrapper
+public struct GradientWrapper<View: UIView> {
+    let option: EZGradientOption
+    let view: View
+    
+    public init(_ view: View, option: EZGradientOption) {
+        self.option = option
+        self.view = view
+        self.option.associatedView = view
+    }
+    
+    public var wrappedValue: View {
+        return view
+    }
+}

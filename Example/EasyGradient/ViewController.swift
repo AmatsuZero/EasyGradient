@@ -10,8 +10,9 @@ import UIKit
 import EasyGradient
 
 class ViewController: UIViewController {
-    
-    let label = UILabel(frame: .init(origin: CGPoint(x: 10, y: 64), size: CGSize(width: 300, height: 100)))
+    @GradientWrapper(UILabel(frame: .init(origin: CGPoint(x: 10, y: 64), size: CGSize(width: 300, height: 100))),
+                     option: EZTextGradientOption.testOption())
+    var label: UILabel
     let textField = UITextField(frame: .init(origin: .init(x: 10, y: 174), size: .init(width: 300, height: 300)))
     let textView = UITextView(frame: .init(origin: .init(x: 10, y: 484), size: .init(width: 300, height: 400)))
 
@@ -31,10 +32,6 @@ class ViewController: UIViewController {
         }
         label.textAlignment = .center
         label.text = "Hello world"
-        let textOptionA = EZTextGradientOption()
-        textOptionA.direction = .leftToRight
-        textOptionA.colors = [.red, .yellow]
-        label.textGradientOption = textOptionA
        
         let borderOption = EZGradientBorderOption()
         borderOption.topBorderColor = .magenta
@@ -69,3 +66,11 @@ class ViewController: UIViewController {
 
 }
 
+extension EZTextGradientOption {
+    static func testOption() -> EZTextGradientOption {
+        let textOptionA = EZTextGradientOption()
+        textOptionA.direction = .leftToRight
+        textOptionA.colors = [.red, .yellow]
+        return textOptionA
+    }
+}
