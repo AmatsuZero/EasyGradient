@@ -241,7 +241,7 @@ import UIKit
     public func asGradientLayer() -> CAGradientLayer {
         let layer = CAGradientLayer()
         layer.colors = gradientColors()?.map { $0.cgColor }
-        layer.locations = locations?.map { $0 as NSNumber }
+        layer.locations = locations?.map { $0 as NSNumber }.filter { !$0.isEqual(to: NSDecimalNumber.notANumber) } // 过滤掉NaN
         layer.endPoint = end
         layer.startPoint = start
         layer.type = mode.asGradientLayerType()
@@ -512,7 +512,7 @@ public extension UIColor {
     /// 真实文字size
     fileprivate var _internalSize: CGSize = .zero {
         didSet {
-           canUpdate = false
+            canUpdate = false
             if let direction = direction {
                 let (start, end) = direction.convert(size: size)
                 self.start = start
@@ -605,9 +605,11 @@ extension EZTextGradientOption {
         guard let str = textView.text, let font = textView.font else {
             return
         }
-        let attrStr = NSAttributedString(string: str, attributes: [ .font: font ])
+        // FIXME: A weird bug, the calculation of bouding rect seems not precise.
+        let attrStr = NSAttributedString(string: str + " ", attributes: [ .font: font ])
         _internalSize = attrStr.boundingRect(with: textView.contentSize,
                                              options: .usesLineFragmentOrigin, context: nil).size
+//        print(_internalSize)
     }
 }
 

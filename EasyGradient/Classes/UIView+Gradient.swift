@@ -11,6 +11,7 @@ import UIKit
 private var bgGradientAssociateKey: Void?
 private var borderGradientAssociateKey: Void?
 private var textGradientAssociateKey: Void?
+private var progressGradientAssociateKey: Void?
 
 public extension UIView {
     @objc var bgGradientOption: EGGradientBackgroundOption? {
@@ -83,5 +84,17 @@ public struct GradientWrapper<View: UIView> {
     
     public var wrappedValue: View {
         return view
+    }
+}
+
+public extension UIProgressView {
+    @objc var progressGradientOption: EZProgressGradientOption? {
+        set {
+            newValue?.associatedView = self
+            objc_setAssociatedObject(self, &progressGradientAssociateKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+        get {
+            objc_getAssociatedObject(self, &progressGradientAssociateKey) as? EZProgressGradientOption
+        }
     }
 }

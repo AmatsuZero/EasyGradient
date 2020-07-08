@@ -14,7 +14,10 @@ class ViewController: UIViewController {
                      option: EZTextGradientOption.testOption())
     var label: UILabel
     let textField = UITextField(frame: .init(origin: .init(x: 10, y: 174), size: .init(width: 300, height: 300)))
-    let textView = UITextView(frame: .init(origin: .init(x: 10, y: 484), size: .init(width: 300, height: 400)))
+    let textView = UITextView(frame: .init(origin: .init(x: 10, y: 474), size: .init(width: 300, height: 200)))
+    let progressView = UIProgressView(frame: .init(origin: .init(x: 10, y: 674), size: .init(width: 300, height: 10)))
+    
+    var timer: Timer?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -57,6 +60,23 @@ class ViewController: UIViewController {
         textOption2.direction = .leftToRight
         textOption2.colors = [.red, .yellow]
         textView.textGradientOption = textOption2
+        progressView.backgroundColor = .red
+        progressView.transform = progressView.transform.scaledBy(x: 1, y: 9)
+        view.addSubview(progressView)
+        let progressOption = EZProgressGradientOption()
+        progressOption.colors = [.red, .yellow]
+        progressOption.direction = .leftToRight
+        progressView.progressGradientOption = progressOption
+        
+        timer = Timer(timeInterval: 1, target: self, selector: #selector(updateProgress(_:)), userInfo: nil, repeats: true)
+        RunLoop.current.add(timer!, forMode: .commonModes)
+    }
+    
+    @objc func updateProgress(_ timer: Timer) {
+        progressView.progress += 0.1
+        if progressView.progress >= 1 {
+            timer.invalidate()
+        }
     }
 
     override func didReceiveMemoryWarning() {
